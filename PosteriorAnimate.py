@@ -5,8 +5,8 @@ Created on Wed Apr 16 22:53:31 2025
 @author: cekom
 """
 
-def PostAnim(df, animate = False, Plot_title='Plot Title', downsample = 1, 
-             mp4Name = 'PosteriorAnimation.mp4', titlesize = 25, fps = 30, 
+def PostAnim(df, animate = True, Plot_title='Plot Title', downsample = 1, 
+             VideoName = 'PosteriorAnimation.mp4', titlesize = 15, fps = 30, 
              cmap = 'BuPu', linecolor = 'darkorchid'):
     '''
 
@@ -15,17 +15,17 @@ def PostAnim(df, animate = False, Plot_title='Plot Title', downsample = 1,
     df : Pandas DataFrame containing all desired parameters already altered to
         desired units and scales
         
-    animate : Do you want an animation or just a plot? The default is False.
+    animate : Do you want an animation or just a plot? The default is True which animates it.
     
     Plot_title : The default is 'Plot Title'.
     
     downsample : How many iterations do you want to skip for the purpose of animation
         The default is 1, which takes every point as an individual frame.
         
-    mp4Name : The default is 'PosteriorAnimation.mp4'.
+    VideoName : The default is 'PosteriorAnimation.mp4'. .gif is also acceptable
     
     titlesize : Sometimes plots get really big and the title sizes need to increase too. 
-        The default is 25.
+        The default is 15.
     fps : Custom fps of mp4 output. The default is 30.
     
     cmap : Colormap for all corner 2d histograms. The default is 'BuPu'.
@@ -75,24 +75,29 @@ def PostAnim(df, animate = False, Plot_title='Plot Title', downsample = 1,
     
     gs_kw = dict(width_ratios= width_ratios, height_ratios= height_ratios)
     fig, axd = plt.subplot_mosaic(layout_pattern,
-                                  gridspec_kw=gs_kw, figsize=(4*num_chains, 2*num_chains))#, constrained_layout=True)
+                                  gridspec_kw=gs_kw, figsize=(4*num_chains, 2*num_chains), constrained_layout=True)
     
-    #plt.show()
     #static scary corner plots with chains
         
         #All of the chain x and y parameters to avoid growing plots in the future
-    for i in range(0, num_chains):
+    for i in range(0, num_chains): 
+        
         axd[str(layout_pattern[i][0])].set_xlim(0, len(df[column_list[i]]))
         axd[str(layout_pattern[i][0])].set_ylim(min(df[column_list[i]]), max(df[column_list[i]]))
-        axd[str(layout_pattern[i][0])].plot(np.arange(0,len(df[column_list[i]]), 1), df[column_list[i]], linewidth = .5, color = linecolor)
-        print('Chain {} done'.format(i+1))
+        
+        if i < num_chains-1:
+            axd[str(layout_pattern[i][0])].set_xticklabels([])
+            #axd[str(layout_pattern[i][0])].tick_params(bottom = False)
+            
         
     axd[layout_pattern[num_chains-1][0]].set_xlabel('Chain Iteration', fontsize = titlesize)
     fig.suptitle(Plot_title, horizontalalignment = 'right', verticalalignment = 'top', fontsize = titlesize)
     
     #Set axis labels
     for i in range(0, num_chains):
-        axd[layout_pattern[num_chains-1][i+1]].set_xlabel('{0}'.format(column_list[i]), fontsize = titlesize)
+        axd[str(layout_pattern[i][0])].plot(np.arange(0,len(df[column_list[i]]), 1), df[column_list[i]], linewidth = .5, color = linecolor)
+        print('Chain {} done'.format(i+1))
+        axd[layout_pattern[num_chains-1][i+1]].set_xlabel('{0}'.format(column_list[i]), fontsize = titlesize, labelpad=15)
         axd[layout_pattern[i][0]].set_ylabel('{0}'.format(column_list[i]), fontsize = titlesize)
         
     #Plot all of the diagonal Histograms
@@ -100,15 +105,34 @@ def PostAnim(df, animate = False, Plot_title='Plot Title', downsample = 1,
     for i in range(0, num_chains):
         hist, bins = np.histogram(df[column_list[i]], density = True)
         axd[layout_pattern[i][Corner_index+1]].stairs(hist, bins, color = linecolor, fill = True)
-        Corner_index = Corner_index+1
+        axd[layout_pattern[i][Corner_index+1]].tick_params(left = False)
+    
         print('Histogram {} done'.format(i+1))
         
+        if i < num_chains-1:
+            axd[layout_pattern[i][Corner_index+1]].set_xticklabels([])
+            axd[layout_pattern[i][Corner_index+1]].set_yticklabels([])
+        
+        Corner_index = Corner_index+1
         
     #Plot the inner histograms
     for i in range(1, num_chains):
         for k in range(1, num_chains):
             if k <= i:
                 axd[layout_pattern[i][k]].hist2d(df[column_list[k-1]], df[column_list[i]], cmap = cmap, density = True)
+            
+                if k > 0:
+                        axd[layout_pattern[i][k+1]].set_yticklabels([])
+                        #axd[layout_pattern[i][k]].tick_params(left = False)
+            
+        if i < num_chains-1:
+            for k in range(1, num_chains):
+                if k <= i:
+                    axd[layout_pattern[i][k]].set_xticklabels([])
+                    #axd[layout_pattern[i][k]].tick_params(bottom = False)
+
+            
+        
         print('2dHist Column {} Done'.format(i))
     
     plt.show()        
@@ -158,7 +182,7 @@ def PostAnim(df, animate = False, Plot_title='Plot Title', downsample = 1,
         
         from tqdm import tqdm
         
-        with writer.saving(fig, mp4Name, 100):
+        with writer.saving(fig, VideoName, 100):
         #Try without Setting Up blank graph lines and plots
         
             for q in tqdm (range(0,len(df[column_list[0]])+1)):
@@ -171,16 +195,19 @@ def PostAnim(df, animate = False, Plot_title='Plot Title', downsample = 1,
                     
                     #Set axis labels
                     for i in range(0, num_chains):
-                        axd[layout_pattern[num_chains-1][i+1]].set_xlabel('{0}'.format(column_list[i]))
+                        axd[layout_pattern[num_chains-1][i+1]].set_xlabel('{0}'.format(column_list[i]), labelpad=15)
                         axd[layout_pattern[i][0]].set_ylabel('{0}'.format(column_list[i]))
-        
 
                     #Setting lengths for the chains, no q iteration
                     for i in range(0, num_chains):
                         axd[str(layout_pattern[i][0])].set_xlim(0, len(df[column_list[i]]))
                         axd[str(layout_pattern[i][0])].set_ylim(min(df[column_list[i]]), max(df[column_list[i]]))
                         
-                #plots with q dependence
+                        if i < num_chains-1:
+                            axd[str(layout_pattern[i][0])].set_xticklabels([])
+                            #axd[str(layout_pattern[i][0])].tick_params(bottom = False)
+                            
+                        #plots with q dependence
                         #Chains
                         axd[str(layout_pattern[i][0])].plot(np.arange(0,len(df[column_list[i]].head(q)), 1), df[column_list[i]].head(q), linewidth = .5, color = linecolor)
                         
@@ -195,6 +222,13 @@ def PostAnim(df, animate = False, Plot_title='Plot Title', downsample = 1,
                         finalhist, finalbins = np.histogram(df[column_list[i]].head(q))                    
                         normal = finalhist/np.absolute((sum(finalhist)*(finalbins[1]-finalbins[0])))
                         axd[layout_pattern[i][Corner_index+1]].stairs(normal, finalbins, color = linecolor, fill = True)
+                        axd[layout_pattern[i][Corner_index+1]].tick_params(left = False)
+                        
+                        if i < num_chains-1:
+                            axd[layout_pattern[i][Corner_index+1]].set_xticklabels([])
+                            axd[layout_pattern[i][Corner_index+1]].set_yticklabels([])
+                            #axd[layout_pattern[i][Corner_index+1]].tick_params(bottom = False)
+                        
                         Corner_index = Corner_index+1
                     
                     #Plot all of the 2dhistograms
@@ -203,6 +237,15 @@ def PostAnim(df, animate = False, Plot_title='Plot Title', downsample = 1,
                             if k <= i:   
                                 axd[layout_pattern[i][k]].hist2d(df[column_list[k-1]].head(q), df[column_list[i]].head(q), cmap = cmap)
                             
+                                if k > 0:
+                                    axd[layout_pattern[i][k+1]].set_yticklabels([])
+                        
+                        if i < num_chains-1:
+                            for k in range(1, num_chains):
+                                if k <= i:
+                                    axd[layout_pattern[i][k]].set_xticklabels([])
+                                    #axd[layout_pattern[i][k]].tick_params(bottom = False)
+                                    
                     writer.grab_frame()
                     
                     #Clear the stair histogram plots because they're tempermental? Yeah.
@@ -210,6 +253,7 @@ def PostAnim(df, animate = False, Plot_title='Plot Title', downsample = 1,
                     for i in range(0, num_chains):
                         axd[layout_pattern[i][Corner_Index+1]].clear()
                         Corner_Index = Corner_Index+1
+                        
                     
                 else:
                     continue
@@ -252,6 +296,7 @@ df_LISA = samples[Parameters]
 
 #%% Run the Function
 
-PostAnim(df_LISA, animate = True, downsample = 5, mp4Name = 'LISA_Animation_all.mp4', titlesize=10, Plot_title = 'LDC0017949155')
+#note, only df is required, while at least downsample and videoname is recommended
+PostAnim(df_LISA, animate = False, downsample = 5, titlesize=15, VideoName = 'test_axis.gif', Plot_title = 'LDC0017949155')
 
  
